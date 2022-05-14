@@ -1,0 +1,70 @@
+Clear-Host
+Write-Host "This will only recognise standard 7 digit UK plates"
+Write-Host ""
+$OpenOrList = Read-Host "Would you like the results in (1) a list or (2) open in your default browser? (1/2)"
+
+$Reg = Read-Host "Please enter vehicle reg without the space"
+$First = $Reg.SubString(0,4)
+$Second = $Reg.SubString(7 -3)
+$MergedReg = "$First%20$Second"
+
+$URL = "https://www1.bcaimage.com/GetDoc.aspx?asp=picture&default=2&width=2480&reg=$MergedReg-GB"
+
+Function Get-RedirectedUrl {
+    Param (
+        [Parameter(Mandatory=$true)]
+        [String]$URL
+    )
+
+    $request = [System.Net.WebRequest]::Create($url)
+    $request.AllowAutoRedirect=$false
+    $response=$request.GetResponse()
+
+    If ($response.StatusCode -eq "Found")
+    {
+        $response.GetResponseHeader("Location")
+    }
+}
+
+try
+{
+$RedirectedURL = Get-RedirectedUrl -URL $URL
+$ImageID = $RedirectedURL.split("/")[8]
+
+}
+catch
+{
+    Write-Host "Reg not found in BCA. Please try again." -ForegroundColor Red
+    Pause
+    Exit
+}
+
+$Image = [int]$ImageID
+$AttemptsToTry = 100
+$AttemptNo=1
+$URLList = @()
+
+
+while ($AttemptNo -le $AttemptsToTry)
+{
+    $BaseURL = "https://bcamediaprod.blob.core.windows.net/public/images/vehicle/GB/$Reg/$Image"
+    Try
+    {
+        Invoke-WebRequest -Uri $BaseURL
+
+        If ($OpenOrList -eq 2)
+        {
+            Start-Process "$BaseURL"
+        }
+        $URLList+=$BaseURL
+        $Image+=1
+        $AttemptNo+=1
+    }
+    Catch
+    {
+        $Image+=1
+        $AttemptNo+=1
+    }
+}
+Clear-Host
+$URLList
